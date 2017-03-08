@@ -141,4 +141,20 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     assert_equal 1, pods.size, "Unable to find web pod"
     assert_equal "Pending", pods.first.status.phase
   end
+
+  def test_errors_from_pods_in_old_replicaset_are_ignored
+    deploy_fixtures("basic", subset: ["web.yml.erb", "configmap-data.yml"], wait: false) do |fixtures|
+      deployment = fixtures["web.yml.erb"]["Deployment"].first
+      deployment["spec"]["replicas"] = 4 # make sure second rollout won't be instant
+
+      container = deployment["spec"]["template"]["spec"]["containers"].first
+      container["command"] = ["/not-a-command"]
+    end
+
+    reset_logs # not strictly necessary, as the error log comes from polling, which the first deploy skipped
+    sleep 2 # make sure bad pods have time to try to start
+
+    deploy_fixtures("basic", subset: ["web.yml.erb", "configmap-data.yml"])
+    refute_logs_match(/RunContainerError/)
+  end
 end

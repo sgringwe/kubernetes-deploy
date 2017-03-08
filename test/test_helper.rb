@@ -14,19 +14,30 @@ ENV["KUBECONFIG"] ||= "#{Dir.home}/.kube/config"
 module KubernetesDeploy
   class TestCase < ::Minitest::Test
     def setup
-      @logger_stream = StringIO.new
-      @logger = Logger.new(@logger_stream)
-      KubernetesDeploy.logger = @logger
-      KubernetesResource.logger = @logger
+      reset_logs
     end
 
     def teardown
       @logger_stream.close
     end
 
+    def reset_logs
+      @logger_stream.close if @logger_stream
+
+      @logger_stream = StringIO.new
+      @logger = Logger.new(@logger_stream)
+      KubernetesDeploy.logger = @logger
+      KubernetesResource.logger = @logger
+    end
+
     def assert_logs_match(regexp)
       @logger_stream.rewind
       assert_match regexp, @logger_stream.read
+    end
+
+    def refute_logs_match(regexp)
+      @logger_stream.rewind
+      refute regexp =~ @logger_stream.read, "Logger stream unexpectedly matched #{regexp.inspect}"
     end
   end
 
