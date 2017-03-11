@@ -10,44 +10,44 @@ module KubernetesDeploy
       json_data, st = run_kubectl("get", type, @name, "--output=json")
       @found = st.success?
       @rollout_data = {}
-      @status = nil
-      @pods = []
+      @status = @new_replica_set = nil
 
       if @found
-        @rollout_data = JSON.parse(json_data)["status"].slice("updatedReplicas", "replicas", "availableReplicas", "unavailableReplicas")
+        deployment_data = JSON.parse(json_data)
+        @rollout_data = deployment_data["status"].slice(
+          "updatedReplicas",
+          "replicas",
+          "availableReplicas",
+          "unavailableReplicas"
+        )
         @status, _ = run_kubectl("rollout", "status", type, @name, "--watch=false") if @deploy_started
 
-        pod_list, st = run_kubectl("get", "pods", "-a", "-l", "name=#{name}", "--output=json")
-        if st.success?
-          pods_json = JSON.parse(pod_list)["items"]
-          pods_json.each do |pod_json|
-            pod_name = pod_json["metadata"]["name"]
-            pod = Pod.new(pod_name, namespace, context, nil, parent: "#{@name.capitalize} deployment")
-            pod.deploy_started = @deploy_started
-            pod.interpret_json_data(pod_json)
-            @pods << pod
-          end
+        # To be replaced with controllerRef-based rs discovery when available
+        # https://github.com/kubernetes/kubernetes/issues/24946
+        # https://github.com/kubernetes/kubernetes/pull/35676 (v1.6 milestone)
+        description, st = run_kubectl("describe", type, @name)
+        description.match(/^NewReplicaSet\:\s+(?<new_rs_name>\S+)/) do |matchdata|
+          @new_replica_set = ReplicaSet.new(matchdata[:new_rs_name], namespace, context, nil, parent: "#{@name.capitalize} deployment")
+          @new_replica_set.deploy_started = @deploy_started
         end
+        @new_replica_set.sync if @new_replica_set
       end
 
       log_status
     end
 
     def deploy_succeeded?
-      return false unless @rollout_data.key?("availableReplicas")
-      # TODO: this should look at the current replica set's pods too
-      @rollout_data["updatedReplicas"].to_i == @rollout_data["replicas"].to_i &&
-      @rollout_data["updatedReplicas"].to_i == @rollout_data["availableReplicas"].to_i
+      # Note that the describe output will declare the rollout finished once desired - maxUnavailable is reached
+      # https://github.com/kubernetes/kubernetes/blob/a22fac00dd389afa0baaa1fe28114847d843f740/pkg/kubectl/rollout_status.go#L69-L84
+      @new_replica_set && @new_replica_set.deploy_succeeded? # what if desired is 0... is there a new rs?
     end
 
     def deploy_failed?
-      # TODO: this should look at the current replica set's pods only or it'll never be true for rolling updates
-      @pods.present? && @pods.all?(&:deploy_failed?)
+      @new_replica_set && @new_replica_set.deploy_failed?
     end
 
     def deploy_timed_out?
-      # TODO: this should look at the current replica set's pods only or it'll never be true for rolling updates
-      super || @pods.present? && @pods.all?(&:deploy_timed_out?)
+      super || @new_replica_set && @new_replica_set.deploy_timed_out?
     end
 
     def exists?
@@ -55,7 +55,9 @@ module KubernetesDeploy
     end
 
     def status_data
-      super.merge(replicas: @rollout_data, num_pods: @pods.length)
+      data = { replicas: @rollout_data }
+      data.merge(new_replica_set: @new_replica_set.status_data) if @new_replica_set
+      super.merge(data)
     end
   end
 end

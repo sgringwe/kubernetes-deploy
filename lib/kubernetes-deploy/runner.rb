@@ -15,6 +15,7 @@ require 'kubernetes-deploy/kubernetes_resource'
   pod
   redis
   service
+  replica_set
 ).each do |subresource|
   require "kubernetes-deploy/kubernetes_resource/#{subresource}"
 end
