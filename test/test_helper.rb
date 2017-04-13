@@ -7,15 +7,15 @@ require 'timecop'
 require 'minitest/autorun'
 require 'minitest/stub/const'
 require 'webmock/minitest'
+require 'mocha/mini_test'
 
-require 'helpers/kubeclient_helper'
-require 'helpers/fixture_deploy_helper'
-require 'helpers/fixture_set'
-require 'helpers/fixture_sets/hello-cloud'
-
+Dir.glob(File.expand_path("../helpers/**/*.rb", __FILE__)).each { |file| require file }
 ENV["KUBECONFIG"] ||= "#{Dir.home}/.kube/config"
 
 WebMock.allow_net_connect!
+Mocha::Configuration.prevent(:stubbing_method_unnecessarily)
+Mocha::Configuration.prevent(:stubbing_non_existent_method)
+Mocha::Configuration.prevent(:stubbing_non_public_method)
 
 module KubernetesDeploy
   class TestCase < ::Minitest::Test
