@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require 'kubeclient'
+require 'kubernetes-deploy/errors'
 
 module KubernetesDeploy
   module KubeclientBuilder

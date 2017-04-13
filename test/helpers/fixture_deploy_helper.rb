@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 module FixtureDeployHelper
+  EJSON_FILENAME = KubernetesDeploy::EjsonSecretProvisioner::EJSON_SECRETS_FILE
+
   # Deploys the specified set of fixtures via KubernetesDeploy::Runner.
   #
   # Optionally takes an array of filenames belonging to the fixture, and deploys that subset only.
@@ -29,11 +31,10 @@ module FixtureDeployHelper
 
     yield fixtures if block_given?
 
-    target_dir = Dir.mktmpdir
-    write_fixtures_to_dir(fixtures, target_dir)
-    deploy_dir(target_dir, wait: wait, allow_protected_ns: allow_protected_ns, prune: prune)
-  ensure
-    FileUtils.remove_dir(target_dir) if target_dir
+    Dir.mktmpdir("fixture_dir") do |target_dir|
+      save_reference_to_tempfiles = write_fixtures_to_dir(fixtures, target_dir)
+      deploy_dir(target_dir, wait: wait, allow_protected_ns: allow_protected_ns, prune: prune)
+    end
   end
 
   def deploy_raw_fixtures(set, wait: true)
@@ -67,6 +68,9 @@ module FixtureDeployHelper
 
   def load_fixtures(set, subset)
     fixtures = {}
+    ejson_file = File.join(fixture_path(set), EJSON_FILENAME)
+    fixtures[EJSON_FILENAME] = JSON.parse(File.read(ejson_file)) if File.exist?(ejson_file)
+
     Dir["#{fixture_path(set)}/*.yml*"].each do |filename|
       basename = File.basename(filename)
       next unless !subset || subset.include?(basename)
@@ -84,6 +88,14 @@ module FixtureDeployHelper
   def write_fixtures_to_dir(fixtures, target_dir)
     files = [] # keep reference outside Tempfile.open to prevent garbage collection
     fixtures.each do |filename, file_data|
+      if filename == EJSON_FILENAME
+        File.open(File.join(target_dir, EJSON_FILENAME), "w") do |f|
+          files << f
+          f.write(file_data.to_json)
+        end
+        next
+      end
+
       basename, exts = extract_basename_and_extensions(filename)
       data = YAML.dump_stream(*file_data.values.flatten)
       Tempfile.open([basename, exts], target_dir) do |f|
@@ -91,6 +103,7 @@ module FixtureDeployHelper
         f.write(data)
       end
     end
+    files
   end
 
   def extract_basename_and_extensions(filename)

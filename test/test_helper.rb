@@ -6,13 +6,14 @@ require 'pry'
 require 'timecop'
 require 'minitest/autorun'
 require 'minitest/stub/const'
+require 'mocha/mini_test'
 
-require 'helpers/kubeclient_helper'
-require 'helpers/fixture_deploy_helper'
-require 'helpers/fixture_set'
-require 'helpers/fixture_sets/hello-cloud'
-
+Dir.glob(File.expand_path("../helpers/**/*.rb", __FILE__)).each { |file| require file }
 ENV["KUBECONFIG"] ||= "#{Dir.home}/.kube/config"
+
+Mocha::Configuration.prevent(:stubbing_method_unnecessarily)
+Mocha::Configuration.prevent(:stubbing_non_existent_method)
+Mocha::Configuration.prevent(:stubbing_non_public_method)
 
 module KubernetesDeploy
   class TestCase < ::Minitest::Test
@@ -36,6 +37,11 @@ module KubernetesDeploy
       else
         assert_match regexp, @logger_stream.read
       end
+    end
+
+    def assert_raises_msg(exception_class, exception_message)
+      exception = assert_raises(exception_class) { yield }
+      assert_match exception_message, exception.message
     end
   end
 
