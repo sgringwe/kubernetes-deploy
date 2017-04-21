@@ -23,7 +23,8 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
 
   def test_create_secrets_with_ejson_keypair_mismatch
     wrong_data = {
-      "2200e55f22dd0c93fac3832ba14842cc75fa5a99a2e01696daa30e188d465036" => "MTM5ZDVjMmEzMDkwMWRkOGFlMTg2YmU1ODJjY2MwYTg4MmMxNmY4ZTBiYjU0Mjk4ODRkYmM3Mjk2ZTgwNjY5ZQo="
+      "2200e55f22dd0c93fac3832ba14842cc75fa5a99a2e01696daa30e188d465036" =>
+        "MTM5ZDVjMmEzMDkwMWRkOGFlMTg2YmU1ODJjY2MwYTg4MmMxNmY4ZTBiYjU0Mjk4ODRkYmM3Mjk2ZTgwNjY5ZQo="
     }
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').returns("data" => wrong_data)
 
@@ -35,7 +36,8 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
 
   def test_create_secrets_with_bad_private_key_in_cloud_keys
     wrong_private = {
-      "65f79806388144edf800bf9fa683c98d3bc9484768448a275a35d398729c892a" => "MTM5ZDVjMmEzMDkwMWRkOGFlMTg2YmU1ODJjY2MwYTg4MmMxNmY4ZTBiYjU0Mjk4ODRkYmM3Mjk2ZTgwNjY5ZQo="
+      "65f79806388144edf800bf9fa683c98d3bc9484768448a275a35d398729c892a" =>
+        "MTM5ZDVjMmEzMDkwMWRkOGFlMTg2YmU1ODJjY2MwYTg4MmMxNmY4ZTBiYjU0Mjk4ODRkYmM3Mjk2ZTgwNjY5ZQo="
     }
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').returns("data" => wrong_private)
     assert_raises_message(KubernetesDeploy::EjsonSecretError, /Decryption failed/) do
@@ -45,7 +47,7 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
 
   def test_create_secrets_with_cloud_keys_secret_missing
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').raises(KubeException.new(404, "not found", nil))
-    assert_raises_message(KubernetesDeploy::EjsonSecretError, /could not find secret ejson-keys in namespace test/) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /secret ejson-keys not found in namespace test/) do
       build_provisioner.create_secrets
     end
   end
@@ -64,7 +66,7 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').returns("data" => correct_ejson_key_secret_data)
     new_content = {
       "_public_key" => fixture_public_key,
-      "kubernetes_secrets" => { "foobar" => { } }
+      "kubernetes_secrets" => { "foobar" => {} }
     }
 
     msg = "Ejson incomplete for secret foobar: secret type unspecified, no data provided"
@@ -106,7 +108,7 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
     @mock_kubeclient ||= mock('kubeclient')
   end
 
-  def build_provisioner(dir=nil)
+  def build_provisioner(dir = nil)
     dir ||= fixture_path('ejson-cloud')
     KubernetesDeploy::EjsonSecretProvisioner.new(
       namespace: 'test',

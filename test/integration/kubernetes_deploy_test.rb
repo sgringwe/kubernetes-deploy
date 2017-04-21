@@ -248,7 +248,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     ejson_cloud = FixtureSetAssertions::EjsonCloud.new(@namespace)
     ejson_cloud.create_ejson_keys_secret
 
-    malformed = { "_bad_data" => ["foo", "bar"] }
+    malformed = { "_bad_data" => %w(foo bar) }
     assert_raises_message(KubernetesDeploy::EjsonSecretError, /Data for secret monitoring-token was invalid/) do
       deploy_fixtures("ejson-cloud") do |fixtures|
         fixtures["secrets.ejson"]["kubernetes_secrets"]["monitoring-token"]["data"] = malformed

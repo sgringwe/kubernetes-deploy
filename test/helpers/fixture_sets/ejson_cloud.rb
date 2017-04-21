@@ -18,7 +18,8 @@ module FixtureSetAssertions
         labels: { name: 'ejson-keys' }
       }
       encoded_data = {
-        "65f79806388144edf800bf9fa683c98d3bc9484768448a275a35d398729c892a" => "ZmVkY2M5NTEzMmU5YjM5OWVlMWY0MDQzNjRmZGJjODFiZGJlNGZlYjViODI5MmIwNjFmMTAyMjQ4MTE1N2Q1YQ=="
+        "65f79806388144edf800bf9fa683c98d3bc9484768448a275a35d398729c892a" =>
+          "ZmVkY2M5NTEzMmU5YjM5OWVlMWY0MDQzNjRmZGJjODFiZGJlNGZlYjViODI5MmIwNjFmMTAyMjQ4MTE1N2Q1YQ=="
       }
       secret = Kubeclient::Secret.new(type: 'Opaque', metadata: metadata, data: encoded_data)
       kubeclient.create_secret(secret)

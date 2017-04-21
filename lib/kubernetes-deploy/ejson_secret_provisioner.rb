@@ -12,7 +12,6 @@ module KubernetesDeploy
   end
 
   class EjsonSecretProvisioner
-
     MANAGEMENT_ANNOTATION = "kubernetes-deploy.shopify.io/ejson-secret"
     MANAGED_SECRET_EJSON_KEY = "kubernetes_secrets"
     EJSON_SECRETS_FILE = "secrets.ejson"
@@ -34,7 +33,8 @@ module KubernetesDeploy
       with_decrypted_ejson do |decrypted|
         secrets = decrypted[MANAGED_SECRET_EJSON_KEY]
         unless secrets.present?
-          KubernetesDeploy.logger.warn("#{EJSON_SECRETS_FILE} does not have key #{MANAGED_SECRET_EJSON_KEY}. No secrets will be created.")
+          KubernetesDeploy.logger.warn("#{EJSON_SECRETS_FILE} does not have key #{MANAGED_SECRET_EJSON_KEY}."\
+            "No secrets will be created.")
           return
         end
 
@@ -140,11 +140,15 @@ module KubernetesDeploy
       KubernetesDeploy.logger.info("Fetching ejson private key from secret #{EJSON_KEYS_SECRET}")
       secret = @kubeclient.get_secret(EJSON_KEYS_SECRET, @namespace)
       encoded_private_key = secret["data"][public_key]
-      raise EjsonSecretError, "Private key for #{public_key} not found in #{EJSON_KEYS_SECRET} secret" unless encoded_private_key
+      unless encoded_private_key
+        raise EjsonSecretError, "Private key for #{public_key} not found in #{EJSON_KEYS_SECRET} secret"
+      end
+
       Base64.decode64(encoded_private_key)
     rescue KubeException => error
       raise unless error.error_code == 404
-      raise EjsonSecretError, "Failed to decrypt ejson: could not find secret #{EJSON_KEYS_SECRET} in namespace #{@namespace}."
+      secret_missing_err = "Failed to decrypt ejson: secret #{EJSON_KEYS_SECRET} not found in namespace #{@namespace}."
+      raise EjsonSecretError, secret_missing_err
     end
   end
 end

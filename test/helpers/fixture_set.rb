@@ -93,7 +93,7 @@ module FixtureSetAssertions
       assert_equal 1, pod_templates.size, "Expected 1 podtemplate, got #{pod_templates.size}"
     end
 
-    def assert_secret_present(secret_name, expected_data=nil, type: 'Opaque', managed: false)
+    def assert_secret_present(secret_name, expected_data = nil, type: 'Opaque', managed: false)
       secrets = kubeclient.get_secrets(namespace: namespace, label_selector: "name=#{secret_name}")
       assert_equal 1, secrets.size, "Expected 1 secret, got #{secrets.size}"
       secret = secrets.first
