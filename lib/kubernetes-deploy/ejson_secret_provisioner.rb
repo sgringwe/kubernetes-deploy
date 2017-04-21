@@ -115,7 +115,10 @@ module KubernetesDeploy
     end
 
     def load_ejson_from_file
+      puts "File exists: #{File.exist?(@ejson_file)}"
+      puts "File has size: #{File.size?(@ejson_file)}"
       raise EjsonSecretError, "#{EJSON_SECRETS_FILE} does not exist" unless File.exist?(@ejson_file)
+      puts "File contents: #{File.read(@ejson_file)}"
       JSON.parse(File.read(@ejson_file))
     rescue JSON::ParserError => e
       raise EjsonSecretError, "Failed to parse encrypted ejson:\n  #{e}"
@@ -123,6 +126,7 @@ module KubernetesDeploy
 
     def with_decrypted_ejson
       Dir.mktmpdir("ejson_keydir") do |key_dir|
+        puts "key_dir: #{key_dir}, public_key: #{public_key}"
         File.write(File.join(key_dir, public_key), private_key)
         decrypted = decrypt_ejson(key_dir)
         yield decrypted
