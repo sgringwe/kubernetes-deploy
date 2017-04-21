@@ -23,11 +23,13 @@ end
 require 'kubernetes-deploy/resource_watcher'
 require "kubernetes-deploy/ui_helpers"
 require 'kubernetes-deploy/kubectl'
+require 'kubernetes-deploy/kubeclient_builder'
 require 'kubernetes-deploy/ejson_secret_provisioner'
 
 module KubernetesDeploy
   class Runner
     include UIHelpers
+    include KubeclientBuilder
 
     PREDEPLOY_SEQUENCE = %w(
       Cloudsql
@@ -111,7 +113,11 @@ MSG
       phase_heading("Checking initial resource statuses")
       resources.each(&:sync)
 
-      ejson = EjsonSecretProvisioner.new(namespace: @namespace, context: @context, template_dir: @template_dir)
+      ejson = EjsonSecretProvisioner.new(
+        namespace: @namespace,
+        template_dir: @template_dir,
+        client: build_v1_kubeclient(@context)
+      )
       if ejson.secrets_requested?
         phase_heading("Creating kubernetes secrets from ejson")
         ejson.create_secrets

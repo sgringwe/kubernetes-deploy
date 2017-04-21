@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 require 'kubeclient'
 require 'kubernetes-deploy/kubeclient_builder/google_friendly_config'
-require 'kubernetes-deploy/errors'
 
 module KubernetesDeploy
   module KubeclientBuilder

@@ -2,21 +2,19 @@
 require 'test_helper'
 
 class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
-  include FixtureDeployHelper
-
   def test_secrets_requested?
     refute build_provisioner(fixture_path('hello-cloud')).secrets_requested?
     assert build_provisioner(fixture_path('ejson-cloud')).secrets_requested?
   end
 
   def test_create_secrets_with_secrets_file_missing
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, /secrets.kubernetes-deploy.ejson not found/) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /secrets.ejson not found/) do
       build_provisioner(fixture_path('hello-cloud')).create_secrets
     end
   end
 
   def test_create_secrets_with_secrets_file_invalid_json
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, /Failed to parse encrypted ejson/) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /Failed to parse encrypted ejson/) do
       with_ejson_file("}") do |target_dir|
         build_provisioner(target_dir).create_secrets
       end
@@ -30,7 +28,7 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').returns("data" => wrong_data)
 
     msg = "Private key for 65f79806388144edf800bf9fa683c98d3bc9484768448a275a35d398729c892a not found"
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, msg) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, msg) do
       build_provisioner.create_secrets
     end
   end
@@ -40,14 +38,14 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
       "65f79806388144edf800bf9fa683c98d3bc9484768448a275a35d398729c892a" => "MTM5ZDVjMmEzMDkwMWRkOGFlMTg2YmU1ODJjY2MwYTg4MmMxNmY4ZTBiYjU0Mjk4ODRkYmM3Mjk2ZTgwNjY5ZQo="
     }
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').returns("data" => wrong_private)
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, /Decryption failed/) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /Decryption failed/) do
       build_provisioner.create_secrets
     end
   end
 
   def test_create_secrets_with_cloud_keys_secret_missing
     mock_kubeclient.expects(:get_secret).with('ejson-keys', 'test').raises(KubeException.new(404, "not found", nil))
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, /could not find secret ejson-keys in namespace test/) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /could not find secret ejson-keys in namespace test/) do
       build_provisioner.create_secrets
     end
   end
@@ -70,7 +68,7 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
     }
 
     msg = "Ejson incomplete for secret foobar: secret type unspecified, no data provided"
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, msg) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, msg) do
       with_ejson_file(new_content) do |target_dir|
         build_provisioner(target_dir).create_secrets
       end
@@ -112,7 +110,6 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
     dir ||= fixture_path('ejson-cloud')
     KubernetesDeploy::EjsonSecretProvisioner.new(
       namespace: 'test',
-      context: KubeclientHelper::MINIKUBE_CONTEXT,
       template_dir: dir,
       client: mock_kubeclient
     )

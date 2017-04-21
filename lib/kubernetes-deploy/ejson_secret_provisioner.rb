@@ -2,7 +2,6 @@
 require 'json'
 require 'base64'
 require 'open3'
-require 'kubernetes-deploy/kubeclient_builder'
 require 'kubernetes-deploy/logger'
 
 module KubernetesDeploy
@@ -13,18 +12,16 @@ module KubernetesDeploy
   end
 
   class EjsonSecretProvisioner
-    include KubernetesDeploy::KubeclientBuilder
 
-    MANAGEMENT_ANNOTATION = "kubernetes-deploy.shopify.io/ejson-secret".freeze
-    MANAGED_SECRET_EJSON_KEY = "kubernetes_secrets".freeze
-    EJSON_SECRETS_FILE = "secrets.kubernetes-deploy.ejson".freeze
-    EJSON_KEYS_SECRET = "ejson-keys".freeze
+    MANAGEMENT_ANNOTATION = "kubernetes-deploy.shopify.io/ejson-secret"
+    MANAGED_SECRET_EJSON_KEY = "kubernetes_secrets"
+    EJSON_SECRETS_FILE = "secrets.ejson"
+    EJSON_KEYS_SECRET = "ejson-keys"
 
-    def initialize(namespace:, context:, template_dir:, client: nil)
+    def initialize(namespace:, template_dir:, client:)
       @namespace = namespace
-      @context = context
       @ejson_file = "#{template_dir}/#{EJSON_SECRETS_FILE}"
-      @kubeclient = client || build_v1_kubeclient(@context)
+      @kubeclient = client
     end
 
     def secrets_requested?

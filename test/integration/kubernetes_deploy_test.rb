@@ -237,7 +237,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
 
     updated_data = { "_test" => "a" }
     deploy_fixtures("ejson-cloud") do |fixtures|
-      fixtures["secrets.kubernetes-deploy.ejson"]["kubernetes_secrets"]["unused-secret"]["data"] = updated_data
+      fixtures["secrets.ejson"]["kubernetes_secrets"]["unused-secret"]["data"] = updated_data
     end
     ejson_cloud.assert_secret_present('unused-secret', updated_data, managed: true)
     ejson_cloud.assert_web_resources_up
@@ -249,9 +249,9 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     ejson_cloud.create_ejson_keys_secret
 
     malformed = { "_bad_data" => ["foo", "bar"] }
-    assert_raises_msg(KubernetesDeploy::EjsonSecretError, /Data for secret monitoring-token was invalid/) do
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /Data for secret monitoring-token was invalid/) do
       deploy_fixtures("ejson-cloud") do |fixtures|
-        fixtures["secrets.kubernetes-deploy.ejson"]["kubernetes_secrets"]["monitoring-token"]["data"] = malformed
+        fixtures["secrets.ejson"]["kubernetes_secrets"]["monitoring-token"]["data"] = malformed
       end
     end
   end
@@ -263,7 +263,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     ejson_cloud.assert_secret_present('unused-secret', managed: true)
 
     deploy_fixtures("ejson-cloud") do |fixtures|
-      fixtures["secrets.kubernetes-deploy.ejson"]["kubernetes_secrets"].delete("unused-secret")
+      fixtures["secrets.ejson"]["kubernetes_secrets"].delete("unused-secret")
     end
     assert_logs_match(/Pruning secret unused-secret/)
 

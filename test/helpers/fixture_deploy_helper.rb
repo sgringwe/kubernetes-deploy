@@ -42,13 +42,6 @@ module FixtureDeployHelper
     deploy_dir(fixture_path(set), wait: wait, bindings: bindings)
   end
 
-  def fixture_path(set_name)
-    source_dir = File.expand_path("../../fixtures/#{set_name}", __FILE__)
-    raise ArgumentError,
-      "Fixture set #{set_name} does not exist as directory #{source_dir}" unless File.directory?(source_dir)
-    source_dir
-  end
-
   # Deploys all fixtures in the given directory via KubernetesDeploy::Runner
   # Exposed for direct use only when deploy_fixtures cannot be used because the template cannot be loaded pre-deploy,
   # for example because it contains an intentional syntax error
