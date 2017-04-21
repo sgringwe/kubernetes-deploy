@@ -33,7 +33,7 @@ module FixtureDeployHelper
     yield fixtures if block_given?
 
     Dir.mktmpdir("fixture_dir") do |target_dir|
-      save_reference_to_tempfiles = write_fixtures_to_dir(fixtures, target_dir)
+      write_fixtures_to_dir(fixtures, target_dir)
       deploy_dir(target_dir, wait: wait, allow_protected_ns: allow_protected_ns, prune: prune, bindings: bindings)
     end
   end
@@ -88,28 +88,9 @@ module FixtureDeployHelper
   end
 
   def write_fixtures_to_dir(fixtures, target_dir)
-    files = [] # keep reference outside Tempfile.open to prevent garbage collection
     fixtures.each do |filename, file_data|
-      if filename == EJSON_FILENAME
-        File.open(File.join(target_dir, EJSON_FILENAME), "w") do |f|
-          files << f
-          f.write(file_data.to_json)
-        end
-        next
-      end
-
-      basename, exts = extract_basename_and_extensions(filename)
-      data = YAML.dump_stream(*file_data.values.flatten)
-      Tempfile.open([basename, exts], target_dir) do |f|
-        files << f
-        f.write(data)
-      end
+      data_str = (filename == EJSON_FILENAME) ? file_data.to_json : YAML.dump_stream(*file_data.values.flatten)
+      File.write(File.join(target_dir, filename), data_str)
     end
-    files
-  end
-
-  def extract_basename_and_extensions(filename)
-    match_data = filename.match(/(?<basename>.*)(?<ext>\.yml(?:\.erb)?)\z/)
-    [match_data[:basename], match_data[:ext]]
   end
 end
