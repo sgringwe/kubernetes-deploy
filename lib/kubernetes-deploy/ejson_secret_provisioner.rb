@@ -23,12 +23,19 @@ module KubernetesDeploy
       @kubeclient = client
     end
 
-    def secrets_requested?
-      File.exist?(@ejson_file)
+    def secret_changes_required?
+      File.exist?(@ejson_file) || managed_secrets_exist?
     end
 
+    def run
+      create_secrets
+      prune_managed_secrets
+    end
+
+    private
+
     def create_secrets
-      raise EjsonSecretError, "#{EJSON_SECRETS_FILE} not found" unless secrets_requested?
+      return unless File.exist?(@ejson_file)
 
       with_decrypted_ejson do |decrypted|
         secrets = decrypted[MANAGED_SECRET_EJSON_KEY]
@@ -51,7 +58,7 @@ module KubernetesDeploy
 
       live_secrets.each do |secret|
         secret_name = secret.metadata.name
-        next unless secret.metadata.annotations.to_h.stringify_keys.key?(MANAGEMENT_ANNOTATION)
+        next unless secret_managed?(secret)
         next if ejson_secret_names.include?(secret_name)
 
         KubernetesDeploy.logger.info("Pruning secret #{secret_name}")
@@ -59,7 +66,14 @@ module KubernetesDeploy
       end
     end
 
-    private
+    def managed_secrets_exist?
+      all_secrets = @kubeclient.get_secrets(namespace: @namespace)
+      all_secrets.any? { |secret| secret_managed?(secret) }
+    end
+
+    def secret_managed?(secret)
+      secret.metadata.annotations.to_h.stringify_keys.key?(MANAGEMENT_ANNOTATION)
+    end
 
     def encrypted_ejson
       @encrypted_ejson ||= load_ejson_from_file

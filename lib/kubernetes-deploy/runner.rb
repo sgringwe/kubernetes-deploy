@@ -118,10 +118,9 @@ MSG
         template_dir: @template_dir,
         client: build_v1_kubeclient(@context)
       )
-      if ejson.secrets_requested?
-        phase_heading("Creating kubernetes secrets from ejson")
-        ejson.create_secrets
-        ejson.prune_managed_secrets
+      if ejson.secret_changes_required?
+        phase_heading("Deploying kubernetes secrets from #{EjsonSecretProvisioner::EJSON_SECRETS_FILE}")
+        ejson.run
       end
 
       phase_heading("Predeploying priority resources")

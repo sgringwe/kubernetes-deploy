@@ -276,6 +276,10 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     ejson_cloud.assert_secret_present('ejson-keys', managed: false)
   end
 
+  def test_pruning_of_existing_managed_secrets_when_ejson_file_has_been_deleted
+    flunk "todo"
+  end
+
   private
 
   def count_by_revisions(pods)
