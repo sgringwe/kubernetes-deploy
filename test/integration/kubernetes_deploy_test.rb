@@ -277,7 +277,22 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
   end
 
   def test_pruning_of_existing_managed_secrets_when_ejson_file_has_been_deleted
-    flunk "todo"
+    ejson_cloud = FixtureSetAssertions::EjsonCloud.new(@namespace)
+    ejson_cloud.create_ejson_keys_secret
+    deploy_fixtures("ejson-cloud")
+    ejson_cloud.assert_all_up
+
+    deploy_fixtures("ejson-cloud") do |fixtures|
+      fixtures.delete("secrets.ejson")
+    end
+
+    assert_logs_match("Pruning secret unused-secret")
+    assert_logs_match("Pruning secret catphotoscom")
+    assert_logs_match("Pruning secret monitoring-token")
+
+    ejson_cloud.refute_resource_exists('secret', 'unused-secret')
+    ejson_cloud.refute_resource_exists('secret', 'catphotoscom')
+    ejson_cloud.refute_resource_exists('secret', 'monitoring-token')
   end
 
   private

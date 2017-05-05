@@ -126,7 +126,7 @@ module KubernetesDeploy
     end
 
     def load_ejson_from_file
-      raise EjsonSecretError, "#{EJSON_SECRETS_FILE} does not exist" unless File.exist?(@ejson_file)
+      return {} unless File.exist?(@ejson_file)
       JSON.parse(File.read(@ejson_file))
     rescue JSON::ParserError => e
       raise EjsonSecretError, "Failed to parse encrypted ejson:\n  #{e}"
