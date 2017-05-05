@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require 'test_helper'
+require 'kubernetes-deploy/runner_task'
 
 class RunnerTaskUnitTest < KubernetesDeploy::TestCase
   def test_missing_namespace
