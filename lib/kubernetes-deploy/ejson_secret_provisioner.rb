@@ -132,7 +132,7 @@ module KubernetesDeploy
       end
       puts "Parsing ejson"
       value = JSON.parse(File.read(@ejson_file))
-      puts "Successfully parsed ejson: #{value.inspect}"
+      puts "Successfully parsed ejson into a #{value.class} / Inspected: #{value.inspect}"
       value
     rescue JSON::ParserError => e
       puts "Ejson parse error raised"
@@ -141,7 +141,7 @@ module KubernetesDeploy
 
     def with_decrypted_ejson
       Dir.mktmpdir("ejson_keydir") do |key_dir|
-        puts "Keydir (#{key_dir}); public_key (#{public_key}); private_key (#{private_key})"
+        puts "Keydir (#{key_dir}); public_key (#{public_key})"
         File.write(File.join(key_dir, public_key), private_key)
         decrypted = decrypt_ejson(key_dir)
         yield decrypted

@@ -10,6 +10,14 @@ class EjsonSecretProvisionerTest < KubernetesDeploy::TestCase
     end
   end
 
+  def test_run_with_secrets_file_invalid_json2
+    assert_raises_message(KubernetesDeploy::EjsonSecretError, /Failed to parse encrypted ejson/) do
+      with_ejson_file("{key:}") do |target_dir|
+        build_provisioner(target_dir).run
+      end
+    end
+  end
+
   private
 
   def correct_ejson_key_secret_data
