@@ -13,11 +13,11 @@ module KubernetesDeploy
 
         case severity
         when "FATAL"
+          ColorizedString.new("[#{severity}][#{datetime}]#{middle}\t").red + "#{msg}\n"
+        when "ERROR"
           colorized_line.red
-        when "ERROR", "WARN"
+        when "WARN"
           colorized_line.yellow
-        when "INFO"
-          msg =~ /^\[(KUBESTATUS|Pod)/ ? colorized_line : colorized_line.blue
         else
           colorized_line
         end

@@ -56,7 +56,6 @@ module KubernetesDeploy
     end
 
     def sync
-      log_status
     end
 
     def deploy_failed?
@@ -77,7 +76,6 @@ module KubernetesDeploy
 
     def status
       @status ||= "Unknown"
-      deploy_timed_out? ? "Timed out with status #{@status}" : @status
     end
 
     def type
@@ -119,8 +117,73 @@ module KubernetesDeploy
       type.downcase.pluralize
     end
 
-    def log_status
-      @logger.info("[KUBESTATUS] #{JSON.dump(status_data)}")
+    def debug_message
+      helpful_info = [deploy_failure_message]
+      not_found_msg = "None found. Please check your usual logging service (e.g. Splunk)."
+
+      events = get_events
+      if events.present?
+        helpful_info << "  - Events:"
+        events.each { |event| helpful_info << "      [#{id}/events]\t#{event.to_json}" }
+      else
+        helpful_info << "  - Events: #{not_found_msg}"
+      end
+
+      container_logs = get_logs
+      if container_logs.blank? || container_logs.values.all?(&:blank?)
+        helpful_info << "  - Logs: #{not_found_msg}"
+      else
+        helpful_info << "  - Logs:"
+        container_logs.each do |container_name, logs|
+          logs.split("\n").each do |line|
+            helpful_info << "      [#{id}/#{container_name}/logs]\t#{line}"
+          end
+        end
+      end
+
+      helpful_info.join("\n")
+    end
+
+    def get_logs
+    end
+
+    def get_events
+      return unless exists?
+      out, _err, st = kubectl.run("get", "events", %(--output=jsonpath={range .items[?(@.involvedObject.name=="#{name}")]}{.involvedObject.kind}\t{.count}\t{.message}\t{.reason}\t{.type}\n{end}))
+      return unless st.success?
+      event_hashes = out.split("\n").each_with_object([]) do |event_blob, events|
+        pieces = event_blob.split("\t")
+        event = {
+          "subject_kind" => pieces[0],
+          "count" => pieces[1],
+          "message" => pieces[2],
+          "reason" => pieces[3],
+          "type" => pieces[4]
+        }
+        events << event if event["subject_kind"].downcase == type.downcase
+      end
+      event_hashes
+    end
+
+    def deploy_failure_message
+      if deploy_failed?
+        <<-MSG.strip_heredoc.chomp
+        #{ColorizedString.new("#{id}: FAILED").red}
+          - Final status: #{status}
+        MSG
+      elsif deploy_timed_out?
+        <<-MSG.strip_heredoc.chomp
+        #{ColorizedString.new("#{id }: TIMED OUT").yellow} (limit: #{timeout}s)
+        Kubernetes will continue to attempt to deploy this resource in the cluster, but at this point it is considered unlikely that it will succeed.
+        If you have reason to believe it will succeed, retry the deploy to continue to monitor the rollout.
+          - Final status: #{status}
+        MSG
+      end
+    end
+
+    def pretty_status
+      padding = " " * (50 - id.length)
+      "#{id}#{padding}#{exists? ? status : "not found"}"
     end
 
     def kubectl

@@ -99,7 +99,8 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
 
   def test_invalid_yaml_fails_fast
     refute deploy_dir(fixture_path("invalid"))
-    assert_logs_match(/Template yaml-error.yml cannot be parsed/)
+    assert_logs_match(/Template 'yaml-error.yml' cannot be parsed/)
+    assert_logs_match(/datapoint1: value1:/)
   end
 
   def test_invalid_k8s_spec_that_is_valid_yaml_fails_fast
@@ -109,7 +110,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
 
-    assert_logs_match(/Dry run failed for template configmap-data/)
+    assert_logs_match(/'configmap-data' is not a valid Kubernetes template/)
     assert_logs_match(/error validating data\: found invalid field myKey for v1.ObjectMeta/)
   end
 
@@ -132,9 +133,10 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
 
-    assert_logs_match(/The following command failed: apply/)
+    assert_logs_match(/Command failed: apply -f/)
     assert_logs_match(/Error from server \(BadRequest\): error when creating/)
-    assert_logs_match(/Inspecting the file mentioned in the error message/)
+    assert_logs_match(/Rendered template content:/)
+    assert_logs_match(/not_a_name:/)
   end
 
   def test_dead_pods_in_old_replicaset_are_ignored
@@ -167,7 +169,8 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
       pod["spec"]["containers"].first["image"] = "hello-world:thisImageIsBad"
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
-    assert_logs_match(%r{The following priority resources failed to deploy: Pod\/unmanaged-pod})
+    assert_logs_match("Failed to deploy 1 priority resources")
+    assert_logs_match(%r{Pod\/unmanaged-pod-\w+-\w+: FAILED})
 
     hello_cloud = FixtureSetAssertions::HelloCloud.new(@namespace)
     hello_cloud.assert_unmanaged_pod_statuses("Failed")
@@ -183,7 +186,8 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
       pod["spec"]["containers"].first["image"] = "hello-world:thisImageIsBad"
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
-    assert_logs_match(%r{The following priority resources failed to deploy: Pod\/unmanaged-pod})
+    assert_logs_match("Failed to deploy 1 priority resources")
+    assert_logs_match(%r{Pod\/unmanaged-pod-\w+-\w+: FAILED})
     assert_logs_match(/DeadlineExceeded/)
   end
 
@@ -205,10 +209,9 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     assert_equal 'binding_test_b', map['BINDING_TEST_B']
   end
 
-  def test_should_raise_if_required_binding_not_present
-    assert_raises NameError do
-      deploy_fixtures('collection-with-erb', subset: ["conf_map.yml.erb"])
-    end
+  def test_deploy_fails_if_required_binding_not_present
+    refute deploy_fixtures('collection-with-erb', subset: ["conf_map.yml.erb"])
+    assert_logs_match("Template 'conf_map.yml.erb' cannot be rendered")
   end
 
   def test_long_running_deployment
@@ -292,6 +295,25 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
     ejson_cloud.refute_resource_exists('secret', 'unused-secret')
     ejson_cloud.refute_resource_exists('secret', 'catphotoscom')
     ejson_cloud.refute_resource_exists('secret', 'monitoring-token')
+  end
+
+  def test_all_failures_and_timeouts_in_primary_deploy_step_are_reported
+    KubernetesDeploy::Service.any_instance.stubs(:deploy_failed?).returns(true)
+    KubernetesDeploy::Deployment.any_instance.stubs(:timeout).returns(1)
+
+    success = deploy_fixtures("hello-cloud", subset: ["redis.yml", "web.yml.erb", "configmap-data.yml"]) do |fixtures|
+      fixtures["redis.yml"].delete("Deployment") # Service will never come up
+      web = fixtures["web.yml.erb"]["Deployment"].first
+      container = web["spec"]["template"]["spec"]["containers"].first
+      container["command"] = ["/usr/sbin/nginx", "-s", "stop"] # it isn't running, so this will log some errors
+    end
+    assert_equal false, success, "Deploy succeeded when it was expected to fail"
+
+    assert_logs_match("Service/redis: FAILED")
+    assert_logs_match("Service/web: FAILED")
+    assert_logs_match("Deployment/web: TIMED OUT (limit: 1s)")
+    assert_logs_match("ScalingReplicaSet") # web deployment event
+    assert_logs_match("nginx: [error]") # web deployment logs
   end
 
   private

@@ -13,7 +13,7 @@ module KubernetesDeploy
       if @found
         @rollout_data = JSON.parse(json_data)["status"]
           .slice("updatedReplicas", "replicas", "availableReplicas", "unavailableReplicas")
-        @status, _err, _ = kubectl.run("rollout", "status", type, @name, "--watch=false") if @deploy_started
+        @status = @rollout_data.map { |st, num| "#{num} #{st}" }.join(", ")
 
         pod_list, _err, st = kubectl.run("get", "pods", "-a", "-l", "name=#{name}", "--output=json")
         if st.success?
@@ -34,8 +34,11 @@ module KubernetesDeploy
           end
         end
       end
+    end
 
-      log_status
+    def get_logs
+      return unless @pods.present?
+      @pods.first.get_logs
     end
 
     def deploy_succeeded?

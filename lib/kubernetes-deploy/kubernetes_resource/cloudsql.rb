@@ -11,8 +11,6 @@ module KubernetesDeploy
       else
         "Unknown"
       end
-
-      log_status
     end
 
     def deploy_succeeded?

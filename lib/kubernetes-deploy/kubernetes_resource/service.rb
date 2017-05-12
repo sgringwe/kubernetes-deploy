@@ -13,7 +13,6 @@ module KubernetesDeploy
         @num_endpoints = 0
       end
       @status = "#{@num_endpoints} endpoints"
-      log_status
     end
 
     def deploy_succeeded?

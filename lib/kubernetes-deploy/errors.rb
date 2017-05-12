@@ -1,6 +1,15 @@
 # frozen_string_literal: true
 module KubernetesDeploy
-  class FatalDeploymentError < StandardError; end
+  class FatalDeploymentError < StandardError
+    def debug_info
+      @debug_info ||= []
+    end
+
+    def add_debug_info(paragrah)
+      debug_info << paragrah
+    end
+  end
+
   class KubectlError < StandardError; end
 
   class NamespaceNotFoundError < FatalDeploymentError

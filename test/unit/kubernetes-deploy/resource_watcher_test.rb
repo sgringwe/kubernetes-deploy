@@ -17,8 +17,7 @@ class ResourceWatcherTest < KubernetesDeploy::TestCase
     watcher = KubernetesDeploy::ResourceWatcher.new([resource], logger: logger)
     watcher.run(delay_sync: 0.1)
 
-    assert_logs_match(/Waiting for web-pod with 1s timeout/)
-    assert_logs_match(/Spent (\S+)s waiting for web-pod/)
+    assert_logs_match(/Successfully deployed in \d.\ds: web-pod/)
   end
 
   def test_failure_with_mock_resource
@@ -27,9 +26,7 @@ class ResourceWatcherTest < KubernetesDeploy::TestCase
     watcher = KubernetesDeploy::ResourceWatcher.new([resource], logger: logger)
     watcher.run(delay_sync: 0.1)
 
-    assert_logs_match(/Waiting for web-pod with 1s timeout/)
-    assert_logs_match(/web-pod failed to deploy with status 'failed'/)
-    assert_logs_match(/Spent (\S+)s waiting for web-pod/)
+    assert_logs_match(/web-pod failed to deploy after \d\.\ds/)
   end
 
   def test_timeout_from_resource
@@ -38,9 +35,7 @@ class ResourceWatcherTest < KubernetesDeploy::TestCase
     watcher = KubernetesDeploy::ResourceWatcher.new([resource], logger: logger)
     watcher.run(delay_sync: 0.1)
 
-    assert_logs_match(/Waiting for web-pod with 1s timeout/)
-    assert_logs_match(/web-pod failed to deploy with status 'timeout'/)
-    assert_logs_match(/Spent (\S+)s waiting for web-pod/)
+    assert_logs_match(/web-pod deployment timed out/)
   end
 
   def test_wait_logging_when_resources_do_not_finish_together
@@ -52,10 +47,9 @@ class ResourceWatcherTest < KubernetesDeploy::TestCase
     watcher = KubernetesDeploy::ResourceWatcher.new([first, second, third, fourth], logger: logger)
     watcher.run(delay_sync: 0.1)
 
-    assert_logs_match(/Waiting for first, second, third, fourth with 4s timeout/)
-    assert_logs_match(/second failed to deploy with status 'timeout'/)
-    assert_logs_match(/third failed to deploy with status 'failed'/)
-    assert_logs_match(/Spent (\S+)s waiting for first, second, third, fourth/)
+    assert_logs_match(/Continuing to wait for: second, third, fourth/)
+    assert_logs_match(/Continuing to wait for: third, fourth/)
+    assert_logs_match(/Continuing to wait for: fourth/)
   end
 
   private

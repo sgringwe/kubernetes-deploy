@@ -5,7 +5,6 @@ module KubernetesDeploy
       _, _err, st = kubectl.run("get", type, @name)
       @status = st.success? ? "Available" : "Unknown"
       @found = st.success?
-      log_status
     end
 
     def deploy_succeeded?
