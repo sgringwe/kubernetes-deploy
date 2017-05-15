@@ -195,7 +195,7 @@ MSG
     def discover_resources
       resources = []
       Dir.foreach(@template_dir) do |filename|
-        next unless filename.end_with?(".yml.erb", ".yml")
+        next unless filename.end_with?(".yml.erb", ".yml", ".yaml")
 
         split_templates(filename) do |tempfile|
           resource_id = discover_resource_via_dry_run(tempfile)
