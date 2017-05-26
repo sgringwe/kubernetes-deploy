@@ -118,7 +118,7 @@ module KubernetesDeploy
       wait_for_completion(resources)
 
       raise_resource_deploy_error(resources) unless resources.all?(&:deploy_succeeded?)
-      report_deploy_success(resources)
+      report_deploy_success(resources, secret_actions: ejson.actions_taken)
       true
     rescue FatalDeploymentError => error
       report_deploy_failure(error.message.to_s, error.debug_info)

@@ -30,9 +30,12 @@ module KubernetesDeploy
       end
     end
 
-    def report_deploy_success(resources)
+    def report_deploy_success(resources, secret_actions:)
       heading("Deploy result: ", "SUCCESS", :green)
-      @logger.info("Deployed #{resources.length} resources in #{Time.now.utc - @started_at}s")
+      actions = ["Deployed #{resources.length} #{'resource'.pluralize(resources.length)}"] + secret_actions
+      actions_sentence = actions[0..-2].join(", ") + " and " + actions[-1]
+
+      @logger.info("#{actions_sentence} in #{Time.now.utc - @started_at}s")
       @logger.blank_line
       resources.each { |r| @logger.info(r.pretty_status) }
     end
