@@ -23,6 +23,13 @@ module KubernetesDeploy
       false
     end
 
+    def timeout_message
+      <<-MSG.strip_heredoc.chomp
+      This service does not have any endpoints. If the related pods are failing, fixing them will solve this as well.
+      If the related pods are up, this service's selector is probably incorrect.
+      MSG
+    end
+
     def exists?
       @found
     end

@@ -6,7 +6,9 @@ module KubernetesDeploy
     def sync
       _, _err, st = kubectl.run("get", type, @name)
       @found = st.success?
-      @status = if cloudsql_proxy_deployment_exists? && mysql_service_exists?
+      @deployment_exists = cloudsql_proxy_deployment_exists?
+      @service_exists = mysql_service_exists?
+      @status = if @deployment_exists && @service_exists
         "Provisioned"
       else
         "Unknown"
@@ -14,7 +16,7 @@ module KubernetesDeploy
     end
 
     def deploy_succeeded?
-      cloudsql_proxy_deployment_exists? && mysql_service_exists?
+      @service_exists && @deployment_exists
     end
 
     def deploy_failed?

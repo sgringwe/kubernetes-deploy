@@ -18,6 +18,10 @@ module KubernetesDeploy
       :replace_force
     end
 
+    def timeout_message
+      UNUSUAL_FAILURE_MESSAGE
+    end
+
     def exists?
       @found
     end

@@ -61,9 +61,5 @@ module KubernetesDeploy
     def exists?
       @found
     end
-
-    def status_data
-      super.merge(replicas: @rollout_data, num_pods: @pods.length)
-    end
   end
 end

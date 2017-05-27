@@ -15,6 +15,10 @@ module KubernetesDeploy
       false
     end
 
+    def timeout_message
+      UNUSUAL_FAILURE_MESSAGE
+    end
+
     def exists?
       @found
     end

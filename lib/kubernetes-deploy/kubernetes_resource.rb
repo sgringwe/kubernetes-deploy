@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'json'
 require 'open3'
 require 'shellwords'
@@ -9,6 +10,16 @@ module KubernetesDeploy
     attr_writer :type, :deploy_started
 
     TIMEOUT = 5.minutes
+
+    DEBUG_RESOURCE_NOT_FOUND_MESSAGE = "None found. Please check your usual logging service (e.g. Splunk)."
+    UNUSUAL_FAILURE_MESSAGE = <<-MSG.strip_heredoc.strip
+      It is very unusual for this resource type to fail to deploy. Please try the deploy again,
+      and contact your cluster administrator if it still fails.
+      MSG
+    STANDARD_TIMEOUT_MESSAGE = <<-MSG.strip_heredoc.strip
+      Kubernetes will continue to attempt to deploy this resource in the cluster, but at this point it is considered unlikely that it will succeed.
+      If you have reason to believe it will succeed, retry the deploy to continue to monitor the rollout.
+      MSG
 
     def self.for_type(type:, name:, namespace:, context:, file:, logger:)
       subclass = case type
@@ -101,50 +112,44 @@ module KubernetesDeploy
       tpr? ? :replace : :apply
     end
 
-    def status_data
-      {
-        group: group_name,
-        name: name,
-        status_string: status,
-        exists: exists?,
-        succeeded: deploy_succeeded?,
-        failed: deploy_failed?,
-        timed_out: deploy_timed_out?
-      }
-    end
-
     def group_name
       type.downcase.pluralize
     end
 
     def debug_message
-      helpful_info = [deploy_failure_message]
-      not_found_msg = "None found. Please check your usual logging service (e.g. Splunk)."
+      helpful_info = []
+      if deploy_failed?
+        helpful_info << ColorizedString.new("#{id}: FAILED").red
+        helpful_info << failure_message if failure_message.present?
+      else
+        helpful_info << "#{ColorizedString.new("#{id }: TIMED OUT").yellow} (limit: #{timeout}s)"
+        helpful_info << timeout_message if timeout_message.present?
+      end
+      helpful_info << "  - Final status: #{status}"
 
       events = get_events
       if events.present?
         helpful_info << "  - Events:"
         events.each { |event| helpful_info << "      [#{id}/events]\t#{event.to_json}" }
       else
-        helpful_info << "  - Events: #{not_found_msg}"
+        helpful_info << "  - Events: #{DEBUG_RESOURCE_NOT_FOUND_MESSAGE}"
       end
 
-      container_logs = get_logs
-      if container_logs.blank? || container_logs.values.all?(&:blank?)
-        helpful_info << "  - Logs: #{not_found_msg}"
-      else
-        helpful_info << "  - Logs:"
-        container_logs.each do |container_name, logs|
-          logs.split("\n").each do |line|
-            helpful_info << "      [#{id}/#{container_name}/logs]\t#{line}"
+      if respond_to?(:get_logs)
+        container_logs = get_logs
+        if container_logs.blank? || container_logs.values.all?(&:blank?)
+          helpful_info << "  - Logs: #{DEBUG_RESOURCE_NOT_FOUND_MESSAGE}"
+        else
+          helpful_info << "  - Logs:"
+          container_logs.each do |container_name, logs|
+            logs.split("\n").each do |line|
+              helpful_info << "      [#{id}/#{container_name}/logs]\t#{line}"
+            end
           end
         end
       end
 
       helpful_info.join("\n")
-    end
-
-    def get_logs
     end
 
     def get_events
@@ -165,25 +170,17 @@ module KubernetesDeploy
       event_hashes
     end
 
-    def deploy_failure_message
-      if deploy_failed?
-        <<-MSG.strip_heredoc.chomp
-        #{ColorizedString.new("#{id}: FAILED").red}
-          - Final status: #{status}
-        MSG
-      elsif deploy_timed_out?
-        <<-MSG.strip_heredoc.chomp
-        #{ColorizedString.new("#{id }: TIMED OUT").yellow} (limit: #{timeout}s)
-        Kubernetes will continue to attempt to deploy this resource in the cluster, but at this point it is considered unlikely that it will succeed.
-        If you have reason to believe it will succeed, retry the deploy to continue to monitor the rollout.
-          - Final status: #{status}
-        MSG
-      end
+    def timeout_message
+      STANDARD_TIMEOUT_MESSAGE
+    end
+
+    def failure_message
     end
 
     def pretty_status
       padding = " " * (50 - id.length)
-      "#{id}#{padding}#{exists? ? status : "not found"}"
+      msg = exists? ? status : "not found"
+      "#{id}#{padding}#{msg}"
     end
 
     def kubectl

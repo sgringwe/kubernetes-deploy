@@ -40,7 +40,7 @@ module KubernetesDeploy
 
       public_send(level, summary.actions_sentence)
       summary.paragraphs.each do |para|
-        blank_line
+        blank_line(level)
         msg_lines = para.split("\n")
         msg_lines.each { |line| public_send(level, line) }
       end
@@ -58,8 +58,7 @@ module KubernetesDeploy
 
       def actions_sentence
         sent = case actions_taken.length
-        when 0 then
-          return "No actions taken"
+        when 0 then "No actions taken"
         when 1 then actions_taken.first
         when 2 then actions_taken.join(" and ")
         else
