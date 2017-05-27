@@ -17,15 +17,12 @@ module KubernetesDeploy
     EJSON_SECRETS_FILE = "secrets.ejson"
     EJSON_KEYS_SECRET = "ejson-keys"
 
-    attr_reader :actions_taken
-
     def initialize(namespace:, context:, template_dir:, logger:)
       @namespace = namespace
       @context = context
       @ejson_file = "#{template_dir}/#{EJSON_SECRETS_FILE}"
       @logger = logger
       @kubectl = Kubectl.new(namespace: @namespace, context: @context, logger: @logger, log_failure_by_default: false)
-      @actions_taken = []
     end
 
     def secret_changes_required?
@@ -52,7 +49,7 @@ module KubernetesDeploy
           validate_secret_spec(secret_name, secret_spec)
           create_or_update_secret(secret_name, secret_spec["_type"], secret_spec["data"])
         end
-        @actions_taken << "created #{secrets.length} #{'secret'.pluralize(secrets.length)}"
+        @logger.summary.add_action("created/updated #{secrets.length} #{'secret'.pluralize(secrets.length)}")
       end
     end
 
@@ -72,7 +69,7 @@ module KubernetesDeploy
         @logger.debug(out)
         raise EjsonSecretError, err unless st.success?
       end
-      @actions_taken << "pruned #{prune_count} #{'secret'.pluralize(prune_count)}" if prune_count > 0
+      @logger.summary.add_action("pruned #{prune_count} #{'secret'.pluralize(prune_count)}") if prune_count > 0
     end
 
     def managed_secrets_exist?

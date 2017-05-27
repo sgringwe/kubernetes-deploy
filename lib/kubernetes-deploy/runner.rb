@@ -22,14 +22,12 @@ require 'kubernetes-deploy/kubernetes_resource'
   require "kubernetes-deploy/kubernetes_resource/#{subresource}"
 end
 require 'kubernetes-deploy/resource_watcher'
-require "kubernetes-deploy/ui_helpers"
 require 'kubernetes-deploy/kubectl'
 require 'kubernetes-deploy/kubeclient_builder'
 require 'kubernetes-deploy/ejson_secret_provisioner'
 
 module KubernetesDeploy
   class Runner
-    include UIHelpers
     include KubeclientBuilder
 
     PREDEPLOY_SEQUENCE = %w(
@@ -80,14 +78,15 @@ module KubernetesDeploy
     end
 
     def run(verify_result: true, allow_protected_ns: false, prune: true)
-      @started_at = Time.now.utc
-      phase_heading("Initializing deploy")
+      @logger.reset
+
+      @logger.phase_heading("Initializing deploy")
       validate_configuration(allow_protected_ns: allow_protected_ns, prune: prune)
       confirm_context_exists
       confirm_namespace_exists
       resources = discover_resources
 
-      phase_heading("Checking initial resource statuses")
+      @logger.phase_heading("Checking initial resource statuses")
       resources.each(&:sync)
       resources.each { |r| @logger.info(r.pretty_status) }
 
@@ -98,16 +97,16 @@ module KubernetesDeploy
         logger: @logger
       )
       if ejson.secret_changes_required?
-        phase_heading("Deploying kubernetes secrets from #{EjsonSecretProvisioner::EJSON_SECRETS_FILE}")
+        @logger.phase_heading("Deploying kubernetes secrets from #{EjsonSecretProvisioner::EJSON_SECRETS_FILE}")
         ejson.run
       end
 
       if deploy_has_priority_resources?(resources)
-        phase_heading("Predeploying priority resources")
+        @logger.phase_heading("Predeploying priority resources")
         predeploy_priority_resources(resources)
       end
 
-      phase_heading("Deploying all resources")
+      @logger.phase_heading("Deploying all resources")
       if PROTECTED_NAMESPACES.include?(@namespace) && prune
         raise FatalDeploymentError, "Refusing to deploy to protected namespace '#{@namespace}' with pruning enabled"
       end
@@ -116,13 +115,14 @@ module KubernetesDeploy
 
       return true unless verify_result
       wait_for_completion(resources)
-
-      raise_resource_deploy_error(resources) unless resources.all?(&:deploy_succeeded?)
-      report_deploy_success(resources, secret_actions: ejson.actions_taken)
-      true
+      record_statuses(resources)
+      success = resources.all?(&:deploy_succeeded?)
     rescue FatalDeploymentError => error
-      report_deploy_failure(error.message.to_s, error.debug_info)
-      false
+      @logger.summary.add_action(error.message)
+      success = false
+    ensure
+      @logger.print_summary(success)
+      success
     end
 
     def template_variables
@@ -133,6 +133,20 @@ module KubernetesDeploy
     end
 
     private
+
+    def record_statuses(resources)
+      failed_resources = resources.reject(&:deploy_succeeded?)
+      fail_count = failed_resources.length
+
+      if fail_count > 0
+        @logger.summary.add_action("failed to deploy #{fail_count} #{'resource'.pluralize(fail_count)}")
+        failed_resources.each { |r| @logger.summary.add_paragraph(r.debug_message) }
+      else
+        @logger.summary.add_action("deployed #{resources.length} #{'resource'.pluralize(resources.length)}")
+        final_statuses = resources.map(&:pretty_status).join("\n")
+        @logger.summary.add_paragraph(final_statuses)
+      end
+    end
 
     def versioned_prune_whitelist
       if server_major_version == "1.5"
@@ -177,7 +191,12 @@ module KubernetesDeploy
         deploy_resources(matching_resources)
         wait_for_completion(matching_resources)
 
-        raise_resource_deploy_error(matching_resources, priority: true) unless matching_resources.all?(&:deploy_succeeded?)
+        failed_resources = matching_resources.reject(&:deploy_succeeded?)
+        fail_count = failed_resources.length
+        if fail_count > 0
+          failed_resources.each { |r| @logger.summary.add_paragraph(r.debug_message) }
+          raise FatalDeploymentError,"Failed to deploy #{fail_count} priority #{'resource'.pluralize(fail_count)}"
+        end
         @logger.blank_line
       end
     end
@@ -204,7 +223,6 @@ module KubernetesDeploy
       resource_id, err, st = kubectl.run(*command, log_failure: false)
 
       unless st.success?
-        deploy_err = FatalDeploymentError.new("Kubectl dry run failed (command: #{Shellwords.join(command)})")
         debug_msg = <<-DEBUG_MSG.strip_heredoc
         This means the template named '#{File.basename(tempfile.path, ".*")}' is not a valid Kubernetes template.
 
@@ -214,8 +232,9 @@ module KubernetesDeploy
         Rendered template content:
         DEBUG_MSG
         debug_msg += File.read(tempfile.path)
-        deploy_err.add_debug_info(debug_msg)
-        raise deploy_err
+        @logger.summary.add_paragraph(debug_msg)
+
+        raise FatalDeploymentError, "Kubectl dry run failed (command: #{Shellwords.join(command)})"
       end
       resource_id
     end
@@ -232,7 +251,6 @@ module KubernetesDeploy
         yield f
       end
     rescue Psych::SyntaxError => e
-      deploy_err = FatalDeploymentError.new("Template '#{filename}' cannot be parsed")
       debug_msg = <<-INFO.strip_heredoc
       Error message: #{e}
 
@@ -240,23 +258,11 @@ module KubernetesDeploy
       ---
       INFO
       debug_msg << rendered_content
-      deploy_err.add_debug_info(debug_msg)
-      raise deploy_err
-    end
-
-    def raise_resource_deploy_error(resources, priority: false)
-      fail_list = resources.select { |r| r.deploy_failed? || r.deploy_timed_out? }
-      error = FatalDeploymentError.new("Failed to deploy #{fail_list.length} #{'priority ' if priority}resources")
-      fail_list.each do |r|
-        error.add_debug_info(r.debug_message)
-      end
-
-      raise error
+      @logger.summary.add_paragraph(debug_msg)
+      raise FatalDeploymentError, "Template '#{filename}' cannot be parsed"
     end
 
     def raise_apply_failure(command, err)
-      deploy_err = FatalDeploymentError.new("Command failed: #{Shellwords.join(command)}")
-
       file_name, file_content = find_bad_file_from_kubectl_output(err)
       if file_name
         debug_msg = <<-HELPFUL_MESSAGE.strip_heredoc
@@ -276,8 +282,8 @@ module KubernetesDeploy
         FALLBACK_MSG
       end
 
-      deploy_err.add_debug_info(debug_msg)
-      raise deploy_err
+      @logger.summary.add_paragraph(debug_msg)
+      raise FatalDeploymentError, "Command failed: #{Shellwords.join(command)}"
     end
 
     def wait_for_completion(watched_resources)
@@ -295,9 +301,8 @@ module KubernetesDeploy
       end
       erb_template.result(erb_binding)
     rescue NameError => e
-      deploy_err = FatalDeploymentError.new("Template '#{filename}' cannot be rendered")
-      deploy_err.add_debug_info("Error from renderer:\n  #{e.message.gsub("\n", ' ')}")
-      raise deploy_err
+      @logger.summary.add_paragraph("Error from renderer:\n  #{e.message.gsub("\n", ' ')}")
+      raise FatalDeploymentError, "Template '#{filename}' cannot be rendered"
     end
 
     def validate_configuration(allow_protected_ns:, prune:)
@@ -335,9 +340,8 @@ module KubernetesDeploy
       end
 
       unless errors.empty?
-        deploy_err = FatalDeploymentError.new("Configuration invalid")
-        deploy_err.add_debug_info(errors.map { |err| "- #{err}" }.join("\n"))
-        raise deploy_err
+        @logger.summary.add_paragraph(errors.map { |err| "- #{err}" }.join("\n"))
+        raise FatalDeploymentError, "Configuration invalid"
       end
 
       @logger.info("All required parameters and files are present")

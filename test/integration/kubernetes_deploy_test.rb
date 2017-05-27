@@ -169,7 +169,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
       pod["spec"]["containers"].first["image"] = "hello-world:thisImageIsBad"
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
-    assert_logs_match("Failed to deploy 1 priority resources")
+    assert_logs_match("Failed to deploy 1 priority resource")
     assert_logs_match(%r{Pod\/unmanaged-pod-\w+-\w+: FAILED})
 
     hello_cloud = FixtureSetAssertions::HelloCloud.new(@namespace)
@@ -186,7 +186,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
       pod["spec"]["containers"].first["image"] = "hello-world:thisImageIsBad"
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
-    assert_logs_match("Failed to deploy 1 priority resources")
+    assert_logs_match("Failed to deploy 1 priority resource")
     assert_logs_match(%r{Pod\/unmanaged-pod-\w+-\w+: FAILED})
     assert_logs_match(/DeadlineExceeded/)
   end
@@ -253,7 +253,7 @@ class KubernetesDeployTest < KubernetesDeploy::IntegrationTest
       fixtures["secrets.ejson"]["kubernetes_secrets"]["monitoring-token"]["data"] = malformed
     end
     assert_equal false, success, "Deploy succeeded when it was expected to fail"
-    assert_logs_match(/Data for secret monitoring-token was invalid/)
+    assert_logs_match(/data for secret monitoring-token was invalid/)
   end
 
   def test_pruning_of_secrets_created_from_ejson

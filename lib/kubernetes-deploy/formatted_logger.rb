@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 require 'logger'
+require 'kubernetes-deploy/deferred_summary_logging'
 
 module KubernetesDeploy
   class FormattedLogger < Logger
+    include DeferredSummaryLogging
+
     def self.build(namespace, context, stream = $stderr, verbose_prefix: false)
       l = new(stream)
       l.level = level_from_env
@@ -35,9 +38,5 @@ module KubernetesDeploy
       end
     end
     private_class_method :level_from_env
-
-    def blank_line(level = :info)
-      public_send(level, "")
-    end
   end
 end
